@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מעבדת מדיה — סטודיו</title>
+<style>
+  :root{
+    --bg: #12110f;
+    --panel: #1a1815;
+    --panel-hi: #211f1a;
+    --line: #33302a;
+    --text: #ece7dd;
+    --text-dim: #9a9385;
+    --amber: #d98f3f;
+    --amber-dim: #8a5f2c;
+    --ok: #7fae6f;
+    --err: #c96a5a;
+    --mono: "JetBrains Mono", "Consolas", monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family: "Segoe UI", Assistant, Arial, sans-serif;
+    min-height:100vh;
+  }
+  .wrap{ max-width: 960px; margin:0 auto; padding: 40px 24px 80px; }
+
+  header{ margin-bottom: 36px; }
+  .kicker{
+    font-family:var(--mono); font-size:12px; letter-spacing:.14em;
+    color:var(--amber); text-transform:uppercase; margin-bottom:10px;
+  }
+  h1{ font-size: 32px; margin:0 0 8px; font-weight:700; letter-spacing:-0.01em;}
+  .sub{ color:var(--text-dim); font-size:15px; line-height:1.6; max-width:640px;}
+
+  nav{
+    display:flex; gap:2px; margin: 28px 0 0; border-bottom:1px solid var(--line);
+    overflow-x:auto;
+  }
+  nav button{
+    background:none; border:none; color:var(--text-dim); font-family:var(--mono);
+    font-size:13px; padding:12px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:2px solid transparent; transition:.15s;
+  }
+  nav button .n{ color:var(--amber-dim); margin-left:6px; }
+  nav button:hover{ color:var(--text); }
+  nav button.active{ color:var(--text); border-bottom-color:var(--amber); }
+  nav button.active .n{ color:var(--amber); }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:28px; margin-top:24px;
+  }
+  .flow{
+    display:flex; align-items:center; gap:8px; font-family:var(--mono);
+    font-size:11px; color:var(--text-dim); margin-bottom:22px; flex-wrap:wrap;
+  }
+  .flow .step{
+    background:var(--panel-hi); border:1px solid var(--line); padding:4px 10px;
+    border-radius:3px; color:var(--text);
+  }
+  .flow .arrow{ color:var(--amber-dim); }
+
+  label{ display:block; font-size:13px; color:var(--text-dim); margin: 18px 0 6px; }
+  label:first-of-type{ margin-top:0; }
+  input[type=text], textarea, select{
+    width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:3px; font-size:14px; font-family:inherit;
+  }
+  textarea{ min-height:80px; resize:vertical; }
+  input[type=file]{
+    width:100%; background:var(--bg); border:1px dashed var(--line); color:var(--text-dim);
+    padding:14px 12px; border-radius:3px; font-size:13px;
+  }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .hint{ font-size:12px; color:var(--text-dim); margin-top:6px; line-height:1.5; }
+  .hint.warn{ color:var(--amber); }
+
+  button.run{
+    margin-top:24px; background:var(--amber); color:#181410; border:none;
+    padding:12px 26px; border-radius:3px; font-weight:700; font-size:14px;
+    cursor:pointer; font-family:inherit;
+  }
+  button.run:hover{ background:#e6a154; }
+  button.run:disabled{ background:var(--amber-dim); cursor:wait; }
+
+  .status{ margin-top:18px; font-family:var(--mono); font-size:13px; }
+  .status.ok{ color:var(--ok); }
+  .status.err{ color:var(--err); white-space:pre-wrap; }
+
+  video, audio{ width:100%; margin-top:18px; border-radius:4px; }
+
+  footer{
+    margin-top: 40px; padding-top:20px; border-top:1px solid var(--line);
+    font-size:12px; color:var(--text-dim); line-height:1.6;
+  }
+  code{ font-family:var(--mono); background:var(--panel-hi); padding:1px 5px; border-radius:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">בית מלאכה מקומי — TTS · Wav2Lip · CogVideo</div>
+    <h1>מעבדת מדיה</h1>
+    <div class="sub">חמישה תהליכים נפרדים על אותה תשתית: קול, שפתיים, וידאו — כל אחד לבד, או משולבים. הכל רץ מול ה-backend המקומי שלך.</div>
+  </header>
+
+  <nav id="tabs"></nav>
+  <div id="panels"></div>
+
+  <footer>
+    כתובת ה-API: <code id="apiBase">http://localhost:8000</code> — ניתן לשינוי ב-<code>API_BASE</code> בראש הקובץ.
+    זהו ממשק בלבד; העיבוד בפועל קורה על מכונת ה-GPU שמריצה את ה-backend.
+  </footer>
+
+</div>
+
+<script>
+const API_BASE = "http://localhost:8000";
+document.getElementById('apiBase').textContent = API_BASE;
+
+const TABS = [
+  {
+    id:"voice-lipsync", n:"05", label:"קול + שפתיים",
+    flow:["סרטון קיים","טקסט + קול","TTS","Wav2Lip","סרטון סופי"],
+    desc:"מעלים סרטון AI מוכן וטקסט — מקבלים אותו סרטון עם קול חדש ושפתיים מסונכרנות. זה השימוש המקורי שביקשת.",
+    fields:[
+      {t:"file", name:"video", label:"סרטון מקור (mp4)", required:true},
+      {t:"textarea", name:"text", label:"מה הדמות תגיד", required:true},
+      {t:"text", name:"language", label:"קוד שפה (he / en / ar...)", value:"he"},
+      {t:"select-or-file", name:"voice", label:"הגדרת קול", presetKey:true},
+    ],
+    endpoint:"/api/pipeline/voice-lipsync", outType:"video"
+  },
+  {
+    id:"tts", n:"01", label:"יצירת קול",
+    flow:["טקסט + reference","TTS (xTTS)","קובץ שמע"],
+    desc:"רק שיבוט/יצירת קול — טקסט הופך לקובץ שמע בקול הנבחר. שימושי לבדוק קול לפני שמחברים לסרטון.",
+    fields:[
+      {t:"textarea", name:"text", label:"הטקסט להקראה", required:true},
+      {t:"text", name:"language", label:"קוד שפה", value:"he"},
+      {t:"select-or-file", name:"voice", label:"הגדרת קול", presetKey:true},
+    ],
+    endpoint:"/api/tts", outType:"audio"
+  },
+  {
+    id:"lipsync", n:"02", label:"סנכרון שפתיים",
+    flow:["סרטון","+ שמע","Wav2Lip","סרטון מסונכרן"],
+    desc:"יש לך כבר גם סרטון וגם קובץ שמע מוכן? זה מסנכרן שפתיים בלבד, בלי ליצור קול חדש.",
+    fields:[
+      {t:"file", name:"video", label:"סרטון (mp4)", required:true},
+      {t:"file", name:"audio", label:"שמע (wav)", required:true},
+    ],
+    endpoint:"/api/lipsync", outType:"video"
+  },
+  {
+    id:"videogen", n:"03", label:"יצירת סרטון",
+    flow:["טקסט / תמונה","CogVideoX","סרטון חדש"],
+    desc:"יוצר סרטון AI חדש מאפס — מתיאור טקסטואלי, או מתמונת פתיחה + תיאור.",
+    fields:[
+      {t:"select", name:"generate_type", label:"סוג יצירה", options:[["t2v","מטקסט בלבד"],["i2v","מתמונה + טקסט"]]},
+      {t:"textarea", name:"prompt", label:"תיאור הסרטון", required:true},
+      {t:"file", name:"source_image", label:"תמונת פתיחה (רק אם i2v)"},
+    ],
+    endpoint:"/api/videogen", outType:"video"
+  },
+  {
+    id:"full", n:"04", label:"הכל ביחד",
+    flow:["טקסט/תמונה","CogVideoX","TTS","Wav2Lip","סרטון מדבר מלא"],
+    desc:"הפייפליין המלא: יוצר סרטון מאפס, יוצר לו קול, ומסנכרן שפתיים — הכי איטי, הכי תובעני.",
+    fields:[
+      {t:"select", name:"generate_type", label:"סוג יצירה", options:[["t2v","מטקסט בלבד"],["i2v","מתמונה + טקסט"]]},
+      {t:"textarea", name:"video_prompt", label:"תיאור הסרטון (למי שנוצר)", required:true},
+      {t:"file", name:"source_image", label:"תמונת פתיחה (רק אם i2v)"},
+      {t:"textarea", name:"spoken_text", label:"מה הדמות תגיד", required:true},
+      {t:"text", name:"language", label:"קוד שפה", value:"he"},
+      {t:"select-or-file", name:"voice", label:"הגדרת קול", presetKey:true},
+    ],
+    endpoint:"/api/pipeline/full", outType:"video"
+  },
+];
+
+let presets = [];
+fetch(API_BASE + "/api/voice-presets").then(r=>r.json()).then(d=>presets=d.presets||[]).catch(()=>{});
+
+const tabsEl = document.getElementById('tabs');
+const panelsEl = document.getElementById('panels');
+
+TABS.forEach((tab, i) => {
+  const b = document.createElement('button');
+  b.innerHTML = `<span class="n">${tab.n}</span>${tab.label}`;
+  b.onclick = () => selectTab(i);
+  b.dataset.idx = i;
+  tabsEl.appendChild(b);
+});
+
+function fieldHTML(f){
+  if(f.t==="file"){
+    return `<label>${f.label}${f.required?' *':''}</label><input type="file" name="${f.name}">`;
+  }
+  if(f.t==="text"){
+    return `<label>${f.label}</label><input type="text" name="${f.name}" value="${f.value||''}">`;
+  }
+  if(f.t==="textarea"){
+    return `<label>${f.label}${f.required?' *':''}</label><textarea name="${f.name}"></textarea>`;
+  }
+  if(f.t==="select"){
+    const opts = f.options.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+    return `<label>${f.label}</label><select name="${f.name}">${opts}</select>`;
+  }
+  if(f.t==="select-or-file"){
+    return `
+      <label>${f.label}</label>
+      <select name="voice_preset" class="voicePresetSelect">
+        <option value="">— בחר קול מוכן —</option>
+      </select>
+      <div class="hint">אין קול מתאים ברשימה? העלה קובץ שמע קצר (6–30 שנ') של הקול הרצוי לשיבוט:</div>
+      <input type="file" name="reference_audio" accept="audio/*">
+      <label>תיאור חופשי (לתיוג בלבד — לדוגמה "סבתא מרוקאית זקנה")</label>
+      <input type="text" name="voice_description" placeholder="לא משפיע ישירות על הקול — לשיבוט צריך קובץ reference או preset">
+    `;
+  }
+  return '';
+}
+
+function selectTab(i){
+  [...tabsEl.children].forEach((b,idx)=>b.classList.toggle('active', idx===i));
+  const tab = TABS[i];
+  const flowHTML = tab.flow.map((s,idx)=>
+    `<span class="step">${s}</span>` + (idx<tab.flow.length-1 ? '<span class="arrow">→</span>' : '')
+  ).join('');
+
+  panelsEl.innerHTML = `
+    <div class="panel">
+      <div class="flow">${flowHTML}</div>
+      <p class="hint" style="margin:0 0 18px;color:var(--text-dim)">${tab.desc}</p>
+      <form id="form-${tab.id}">
+        ${tab.fields.map(fieldHTML).join('')}
+        <button type="submit" class="run">הרץ</button>
+      </form>
+      <div id="status-${tab.id}" class="status"></div>
+      <div id="result-${tab.id}"></div>
+    </div>
+  `;
+
+  // populate voice preset dropdown(s)
+  panelsEl.querySelectorAll('.voicePresetSelect').forEach(sel=>{
+    presets.forEach(p=>{
+      const o = document.createElement('option');
+      o.value = p; o.textContent = p;
+      sel.appendChild(o);
+    });
+  });
+
+  document.getElementById(`form-${tab.id}`).addEventListener('submit', (e)=>runTab(e, tab));
+}
+
+async function runTab(e, tab){
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button.run');
+  const statusEl = document.getElementById(`status-${tab.id}`);
+  const resultEl = document.getElementById(`result-${tab.id}`);
+  resultEl.innerHTML = '';
+  statusEl.className = 'status';
+  statusEl.textContent = 'שולח בקשה ל-backend... זה עשוי לקחת זמן (עד כמה דקות, תלוי בשירות ובחומרה).';
+  btn.disabled = true;
+
+  try{
+    const fd = new FormData(form);
+    const res = await fetch(API_BASE + tab.endpoint, { method:'POST', body:fd });
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`שגיאה מהשרת (${res.status}):\n${errText}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if(tab.outType === 'video'){
+      resultEl.innerHTML = `<video controls src="${url}"></video>`;
+    } else {
+      resultEl.innerHTML = `<audio controls src="${url}"></audio>`;
+    }
+    statusEl.className = 'status ok';
+    statusEl.textContent = '✓ הושלם בהצלחה.';
+  }catch(err){
+    statusEl.className = 'status err';
+    statusEl.textContent = '✗ ' + err.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+selectTab(0);
+</script>
+</body>
+</html>

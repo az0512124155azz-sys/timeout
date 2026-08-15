@@ -1,0 +1,26 @@
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# שירות 1: TTS / שיבוט קול (coqui-ai/TTS)
+TTS==0.22.0
+
+# שירות 2: Wav2Lip - תלויות (אין requirements.txt מסודר ב-repo המקורי, אלה הנפוצות)
+librosa==0.9.1
+numba
+opencv-python
+opencv-contrib-python
+tqdm
+
+# שירות 3: CogVideo - נטען דרך diffusers של Hugging Face
+torch>=2.1.0
+diffusers>=0.30.1
+transformers>=4.44.0
+accelerate>=0.33.0
+imageio
+imageio-ffmpeg
+sentencepiece
+
+# הערה: יש להתקין torch עם תמיכת CUDA מתאימה לכרטיס המסך שלך.
+# ראו: https://pytorch.org/get-started/locally/
