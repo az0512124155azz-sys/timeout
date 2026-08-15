@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Voice & LipSync Chat</title>
+<style>
+:root{
+  --bg:#f7f5f2;--sidebar:#efede8;--panel:#ffffff;--text:#26231f;--muted:#777168;
+  --line:#ddd8d0;--accent:#c96f45;--accent-dark:#aa5630;--user:#e9e5de;--ok:#2f7d4b;--bad:#a33d36
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+.app{height:100vh;display:grid;grid-template-columns:270px 1fr;direction:ltr}
+.sidebar{direction:rtl;background:var(--sidebar);border-right:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:16px}
+.logo{font-size:20px;font-weight:800}
+.newchat{border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer}
+.small{font-size:12px;color:var(--muted);line-height:1.6}
+.status{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:#aaa}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+.main{direction:rtl;display:flex;flex-direction:column;min-width:0}
+.top{height:60px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;background:rgba(247,245,242,.92)}
+.title{font-weight:700}
+.chat{flex:1;overflow:auto;padding:34px 20px 170px}
+.inner{max-width:820px;margin:0 auto}
+.welcome{text-align:center;padding:64px 20px 36px}
+.welcome h1{font-size:34px;margin:0 0 12px}
+.welcome p{font-size:16px;color:var(--muted);line-height:1.7;max-width:620px;margin:0 auto}
+.examples{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.example{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;cursor:pointer}
+.msg{display:flex;margin:20px 0}.msg.user{justify-content:flex-start}.msg.assistant{justify-content:flex-end}
+.bubble{max-width:78%;border-radius:16px;padding:14px 16px;line-height:1.6;white-space:pre-wrap}
+.user .bubble{background:var(--user)}.assistant .bubble{background:transparent;padding-left:0}
+.attachments{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.filecard{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-size:12px}
+.meta{font-size:11px;color:var(--muted);margin-top:7px}
+.progress{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.progress b{display:block;margin-bottom:6px}.steps{font-size:12px;color:var(--muted);line-height:1.8}
+.result video{width:100%;margin-top:12px;border-radius:12px;background:#000}.result a{display:inline-block;margin-top:10px;color:var(--accent-dark);font-weight:700;text-decoration:none}
+.composerWrap{position:fixed;left:270px;right:0;bottom:0;padding:18px 20px 26px;background:linear-gradient(transparent,var(--bg) 30%);direction:rtl}
+.composer{max-width:820px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 8px 28px rgba(0,0,0,.08)}
+.selected{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.pill{background:#f2eee8;border:1px solid var(--line);border-radius:9px;padding:7px 9px;font-size:12px}
+.row{display:flex;align-items:flex-end;gap:10px}.plus,.send{border:0;cursor:pointer}
+.plus{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:22px}
+.input{flex:1;border:0;outline:0;resize:none;min-height:44px;max-height:140px;padding:10px 4px;font:inherit}
+.send{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;font-size:20px}.send:disabled{opacity:.45;cursor:wait}
+.options{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:9px;border-top:1px solid #eee9e2;margin-top:7px}
+select{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;font:inherit;font-size:12px}
+.voicebtn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;font-size:12px;cursor:pointer}
+.hint{font-size:11px;color:var(--muted)}
+.hidden{display:none}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{display:none}.composerWrap{left:0}.bubble{max-width:92%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">AI Studio</div>
+    <button class="newchat" onclick="resetChat()">＋ שיחה חדשה</button>
+    <div class="small">
+      המערכת הזו עושה דבר אחד בצורה פשוטה:<br><br>
+      1. מעלים סרטון AI<br>
+      2. כותבים מה הדמות תגיד<br>
+      3. בוחרים/מעלים קול<br>
+      4. המערכת יוצרת שמע ומסנכרנת את השפתיים
+    </div>
+    <div class="status"><span id="dot" class="dot"></span><span id="statusText">בודק backend…</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="top"><div class="title">AI Voice + LipSync</div></div>
+    <div class="chat">
+      <div class="inner" id="messages">
+        <section class="welcome" id="welcome">
+          <h1>מה תרצה שהדמות תגיד?</h1>
+          <p>
+            תעלה סרטון AI, תכתוב את המשפטים, ותבחר קול.
+            אני אייצר את הקול ואסנכרן את תנועות השפתיים לסרטון.
+          </p>
+          <div class="examples">
+            <button class="example" onclick="setText('תגרום לדמות בסרטון להגיד: שלום לכולם, ברוכים הבאים לערוץ שלי')">דוגמה בעברית</button>
+            <button class="example" onclick="setText('תגרום לדמות בסרטון להגיד את הטקסט הבא בקול שאני מעלה')">עם קול לדוגמה</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="composerWrap">
+  <div class="composer">
+    <div id="selected" class="selected"></div>
+    <div class="row">
+      <button class="plus" onclick="videoInput.click()" title="העלה סרטון">＋</button>
+      <textarea id="text" class="input" rows="1" placeholder="לדוגמה: תגרום לדמות להגיד 'שלום, מה נשמע?'"></textarea>
+      <button id="sendBtn" class="send" onclick="runPipeline()">↑</button>
+    </div>
+    <div class="options">
+      <button class="voicebtn" onclick="videoInput.click()">🎬 סרטון AI</button>
+      <button class="voicebtn" onclick="voiceInput.click()">🎙️ קול לדוגמה</button>
+      <select id="preset"><option value="">קול שהעליתי / ברירת מחדל</option></select>
+      <select id="language">
+        <option value="he">עברית</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+      <span class="hint">קובץ קול קצר של האדם הרצוי משמש כ-reference לשיבוט הקול</span>
+    </div>
+  </div>
+</div>
+
+<input id="videoInput" class="hidden" type="file" accept="video/*">
+<input id="voiceInput" class="hidden" type="file" accept="audio/*">
+
+<script>
+const API_BASE="http://127.0.0.1:8000";
+const messages=document.getElementById("messages");
+const textEl=document.getElementById("text");
+const videoInput=document.getElementById("videoInput");
+const voiceInput=document.getElementById("voiceInput");
+const selected=document.getElementById("selected");
+const sendBtn=document.getElementById("sendBtn");
+let videoFile=null, voiceFile=null;
+
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]))}
+function setText(t){textEl.value=t;textEl.focus()}
+function resetChat(){
+  [...messages.querySelectorAll(".msg")].forEach(x=>x.remove());
+  document.getElementById("welcome").style.display="block";
+  videoFile=null;voiceFile=null;textEl.value="";renderSelected();
+}
+videoInput.onchange=()=>{videoFile=videoInput.files[0]||null;renderSelected()}
+voiceInput.onchange=()=>{voiceFile=voiceInput.files[0]||null;renderSelected()}
+function renderSelected(){
+  selected.innerHTML=[
+    videoFile?`<span class="pill">🎬 ${esc(videoFile.name)}</span>`:"",
+    voiceFile?`<span class="pill">🎙️ ${esc(voiceFile.name)}</span>`:""
+  ].join("");
+}
+function addMsg(role,html){
+  document.getElementById("welcome").style.display="none";
+  const d=document.createElement("div");d.className="msg "+role;
+  d.innerHTML=`<div class="bubble">${html}</div>`;messages.appendChild(d);
+  d.scrollIntoView({behavior:"smooth",block:"end"});return d;
+}
+textEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();runPipeline()}});
+
+async function loadPresets(){
+  try{
+    const r=await fetch(API_BASE+"/api/voice-presets");
+    if(!r.ok)return;
+    const data=await r.json();
+    const sel=document.getElementById("preset");
+    (data.presets||[]).forEach(p=>{
+      const o=document.createElement("option");
+      o.value=typeof p==="string"?p:(p.name||p.id||"");
+      o.textContent=typeof p==="string"?p:(p.label||p.name||p.id||"קול");
+      sel.appendChild(o);
+    });
+  }catch{}
+}
+
+async function health(){
+  try{
+    const r=await fetch(API_BASE+"/api/health");
+    if(!r.ok)throw new Error();
+    dot.className="dot ok";statusText.textContent="backend מחובר";
+  }catch{
+    dot.className="dot bad";statusText.textContent="backend לא מחובר";
+  }
+}
+
+async function runPipeline(){
+  const text=textEl.value.trim();
+  if(!videoFile){
+    addMsg("assistant","צריך קודם לצרף סרטון AI. לחץ על 🎬 סרטון AI ובחר קובץ.");
+    return;
+  }
+  if(!text){
+    addMsg("assistant","כתוב לי מה אתה רוצה שהדמות תגיד.");
+    return;
+  }
+
+  addMsg("user",`${esc(text)}
+<div class="attachments">
+  <span class="filecard">🎬 ${esc(videoFile.name)}</span>
+  ${voiceFile?`<span class="filecard">🎙️ ${esc(voiceFile.name)}</span>`:""}
+</div>`);
+
+  const working=addMsg("assistant",`עובד על זה…
+<div class="progress">
+<b>מבצע את הפייפליין:</b>
+<div class="steps">1. יוצר קול AI מהטקסט<br>2. מתאים את הקול שבחרת<br>3. מסנכרן את תנועות השפתיים<br>4. מכין סרטון סופי</div>
+</div>`);
+
+  sendBtn.disabled=true;
+  try{
+    const fd=new FormData();
+    fd.append("video",videoFile);
+    fd.append("text",text);
+    fd.append("language",document.getElementById("language").value);
+    const preset=document.getElementById("preset").value;
+    if(preset)fd.append("voice_preset",preset);
+    if(voiceFile)fd.append("reference_audio",voiceFile);
+
+    const r=await fetch(API_BASE+"/api/pipeline/voice-lipsync",{method:"POST",body:fd});
+    if(!r.ok){
+      let detail=await r.text();
+      try{detail=JSON.parse(detail).detail||detail}catch{}
+      throw new Error(detail);
+    }
+
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    working.querySelector(".bubble").innerHTML=`מוכן ✅
+<div class="result">
+  <video controls src="${url}"></video>
+  <a href="${url}" download="final_lipsync.mp4">הורד את הסרטון הסופי</a>
+</div>
+<div class="meta">הקול נוצר והשפתיים סונכרנו לשמע החדש.</div>`;
+  }catch(e){
+    working.querySelector(".bubble").innerHTML=`לא הצלחתי להשלים את העיבוד.
+<div class="meta">${esc(e.message||e)}</div>`;
+  }finally{
+    sendBtn.disabled=false;
+  }
+}
+
+health();loadPresets();setInterval(health,10000);
+</script>
+</body>
+</html>
